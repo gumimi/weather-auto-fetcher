@@ -1,20 +1,21 @@
 name: Daily Weather Data Fetcher
 
-# 実行タイマーの設定（例: 毎日AM6:00 UTC = 日本時間15:00 に自動実行）
 on:
   schedule:
     - cron: '0 6 * * *'
-  workflow_dispatch: # 手動で即時テスト実行できるボタンも用意
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: リポジトリのコードを取得
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Python環境のセットアップ
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
