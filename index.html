@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天気予報ダッシュボード</title>
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen antialiased">
+
+    <!-- ヘッダー -->
+    <header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-8 shadow-lg">
+        <div class="max-w-4xl mx-auto px-4 text-center">
+            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">天気予報ダッシュボード</h1>
+            <p id="sub-header" class="text-blue-100 text-sm sm:text-base font-medium">データを読み込み中...</p>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-4xl mx-auto px-4 py-8">
+        
+        <!-- エラーメッセージ表示エリア（初期状態は非表示） -->
+        <div id="error-message" class="hidden bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm my-6">
+            <div class="flex items-center">
+                <svg class="h-6 w-6 text-red-500 mr-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <div>
+                    <h3 class="text-red-800 font-bold text-base">エラー</h3>
+                    <p class="text-red-700 text-sm mt-1">データを読み込めませんでした。`data.json` が正しく生成されているか確認してください。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ローディングインジケーター -->
+        <div id="loading" class="flex flex-col items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
+            <p class="mt-4 text-slate-500 text-sm font-medium">天気データを取得しています...</p>
+        </div>
+
+        <!-- 天気データ表示エリア（JavaScriptで動的生成） -->
+        <div id="weather-container" class="space-y-10"></div>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="mt-auto py-6 border-t border-slate-200 text-center text-xs text-slate-400">
+        <p>Source: 気象庁 Japan Meteorological Agency Open Data</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchWeatherData();
+        });
+
+        // data.json からデータを取得して表示する関数
+        async function fetchWeatherData() {
+            const loadingEl = document.getElementById('loading');
+            const errorEl = document.getElementById('error-message');
+            const containerEl = document.getElementById('weather-container');
+            const subHeaderEl = document.getElementById('sub-header');
+
+            try {
+                // キャッシュを防ぐためにタイムスタンプを付与
+                const response = await fetch(`data.json?t=${new Date().getTime()}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // データ検証
+                if (!Array.isArray(data) || data.length === 0) {
+                    throw new Error('Data is empty or invalid format');
+                }
+
+                // ローディング非表示
+                loadingEl.classList.add('hidden');
+
+                // サブヘッダーのテキストを更新
+                subHeaderEl.textContent = '気象庁オープンデータに基づく最新の天気情報';
+
+                // 天気予報カードの描画
+                renderWeather(data, containerEl);
+
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                loadingEl.classList.add('hidden');
+                subHeaderEl.textContent = 'データの取得に失敗しました';
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        // 天気データをDOMに書き出す関数
+        function renderWeather(data, container) {
+            container.innerHTML = '';
+
+            data.forEach(areaData => {
+                // 各地域ごとのセクション枠
+                const areaSection = document.createElement('section');
+                areaSection.className = 'bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8 transition-all hover:shadow-md';
+
+                // 地域名見出し
+                const areaTitle = document.createElement('h2');
+                areaTitle.className = 'text-xl sm:text-2xl font-bold text-slate-800 border-b border-slate-100 pb-4 mb-6 flex items-center';
+                areaTitle.innerHTML = `
+                    <svg class="w-6 h-6 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    ${escapeHtml(areaData.area_name)}
+                `;
+                areaSection.appendChild(areaTitle);
+
+                // 予報カードグリッド
+                const forecastGrid = document.createElement('div');
+                forecastGrid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4';
+
+                areaData.forecasts.forEach(forecast => {
+                    const forecastCard = document.createElement('div');
+                    forecastCard.className = 'bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-xl p-5 border border-slate-100 flex flex-col justify-between hover:border-indigo-200 transition-colors';
+
+                    // 日付フォーマットの整形 (ISO 8601 -> 月日 曜日)
+                    const formattedDate = formatDate(forecast.date);
+
+                    forecastCard.innerHTML = `
+                        <div>
+                            <span class="inline-block text-xs font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md mb-2">
+                                ${formattedDate}
+                            </span>
+                            <p class="text-base font-semibold text-slate-700 leading-relaxed mt-1">
+                                ${escapeHtml(forecast.weather)}
+                            </p>
+                        </div>
+                    `;
+                    forecastGrid.appendChild(forecastCard);
+                });
+
+                areaSection.appendChild(forecastGrid);
+                container.appendChild(areaSection);
+            });
+        }
+
+        // 日付文字列（ISO 8601形式）を読みやすく変換するヘルパー関数
+        function formatDate(dateStr) {
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return dateStr;
+
+                const month = date.getMonth() + 1;
+                const day = date.getDate();
+                const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+                const weekDay = weekDays[date.getDay()];
+
+                return `${month}月${day}日 (${weekDay})`;
+            } catch (e) {
+                return dateStr;
+            }
+        }
+
+        // XSS対策のためのエスケープ処理
+        function escapeHtml(str) {
+            if (typeof str !== 'string') return '';
+            return str.replace(/[&<>"']/g, match => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[match]));
+        }
+    </script>
+</body>
+</html>
